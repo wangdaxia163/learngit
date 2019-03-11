@@ -1,0 +1,64 @@
+linux下PHP项目写入日志失败，fopen(xxx.log): failed to open stream: Permission denied
+2017年10月10日 15:30:32 baozoumingren 阅读数：2688
+初次搭建lnmp服务的时候，总会有这个那个坑，对于一个接手别人工作的PHPer来说，迁移服务器，搭建一个已有的项目，很多东西都已经集成好了，所以配置什么的的只能自己摸索。
+
+这次遇到的问题是，每天生成的日志文件都是无法写入的，没有权限写入，而旧服务器日志系统是完好的，到了新的服务器却发现各种没权限，经过百度+百度+百度，终于找到了一点突破口
+
+提醒：本文只针对于懒得修改日志服务源代码，或者网上下载的日志服务源代码会用不会改的朋友，dalao请不必浪费时间
+
+1，检查php-fpm的用户是谁 
+通过 ps -ef | grep php-fpm 查看用户权限，如下图： 
+php-fpm用户权限一览
+
+2，检查日志文件夹所属用户及用户组 
+cd到日志文件夹所在目录，ll查看日志文件夹所属用户和用户组 
+logs用户和用户组
+
+注意：
+
+如果php-fpm所属用户没配置，则为nobody用户，而项目日志文件夹如果没配置，则为root用户组，nobody用户组是没有权限打开root用户组创建的文件的，这里跟你给不给目录权限777没有关系，就算你给了777，下次生成的文件，还是以目录所有者为主，生成一个属于root用户组的日志文件，权限为644，nobody用户组是无法访问的。
+
+解决方法1： 
+继续使用php-fpm的用户nobody，修改logs目录的用户，将logs用户修改为nobody用户组：
+
+chown -R nobody:nobody logs
+//参数说明：chown -R 用户：用户组  目录名
+1
+2
+从百度上听说，nobody用户是linux系统的一种保护机制（excuse？），如果网站被黑客攻击了，拿到了nobody用户，是没有权限进行别的操作的，也就是说拿到了nobody用户也攻击不了linux系统的意思。
+
+解决方法2： 
+直接修改php-fpm的所属用户和用户组与logs目录所属用户和用户组一致，logs日志默认为root，此处不推荐用root，可以自己创建一个用户，专门用来管理php项目，示例用www-data：
+
+php-fpm的所属用户在php-fpm.conf里面配置，如果不知道配置文件的路径，使用find命令查找
+
+find / -name php-fpm.conf
+1
+然后通过vim命令编辑，通过 /user 命令查找并高亮php-fpm所属用户，如下图户如下图
+
+php-fpm.conf
+
+修改完毕后，记得重启php-fpm
+
+killall -9 php-fpm
+/usr/local/php/sbin/php-fpm
+1
+2
+大功告成！！删除原先生成的日志文件再测试吧！！！
+
+如果做完以上步骤还不行，就检查一下nginx的用户，把nginx用户也改为与php-fpm用户一样，nginx用户配置在nginx.conf文件夹里
+
+ps-ef | grep nginx
+1
+找到user配置，修改为php-fpm所属用户，示例为www-data： 
+nginx.conf
+
+user配置一般在nginx.conf前几行。
+
+综合上面的，一般能解决问题了（个人亲测），希望能对相同问题的人有用。
+
+顺便，理查德天下第一！
+
+相关文章： 
+烂泥：nginx、php-fpm、mysql用户权限解析 
+http://www.mamicode.com/info-detail-243751.html
