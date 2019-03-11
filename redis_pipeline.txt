@@ -1,0 +1,40 @@
+昨天因为工作的需求，需要做一个后台上传TXT文件，读取其中的内容，然后导入redis库中。要求速度快，并且支持至少10W以上的数据，而内容也就一个字段存类似openid和QQ。我一开始做的时候就老套路，遍历、hset，然后就发现非常的慢，一千条数据就花了30-32秒，当时就觉得不行，于是就请教了一个大佬，然后就得知了方法
+
+我生成了20W的数据用来做测试，文件大小6M多。
+
+话不多说，直接贴代码了
+
+$lines  = file_get_contents($_FILES['file']['tmp_name']);//获取文件内容
+ini_set('memory_limit', '-1');//不要限制Mem大小，否则会报错
+$line   = explode("\r\n",$lines);//转换成数组
+//实例化redis
+$redis = new Redis();
+//连接
+$redis->connect('127.0.0.1', 6379);
+$redis->pipeline();//开启管道
+if(!$redis){
+    throw new Exception('redis连接失败！',1);
+}
+$key   = $info['key'];
+$c     = 0;
+$count = count($line);
+$now   = time();
+for($i=0;$i<$count;$i++){
+    $res = $redis->hset($key,$line[$i],1);
+    if($res){
+        $c ++;
+    }
+}
+$redis->exec();
+使用结果：
+
+
+
+哈哈，即使就直接用time()方法获取的，是计秒的，没有毫秒那种效果，不过也可以看出来确实是非常的快，20W的数据不到两秒就存进去了
+
+其实整个代码都非常简单，能让redis快速导入的就是一个点“pipeline”，开启了这个就可以了。哈哈以前没有用过，所以就小小的记录一下。
+--------------------- 
+作者：逝去日子如风 
+来源：CSDN 
+原文：https://blog.csdn.net/hzj1064189928/article/details/80499657 
+版权声明：本文为博主原创文章，转载请附上博文链接！
